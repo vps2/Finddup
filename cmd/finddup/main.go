@@ -1,21 +1,33 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 
 	"github.com/vps2/finddup/internal/fs"
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		log.Fatal("Missing directory argument.")
+	dir := flag.String("dir", "", "The directory in which to search for duplicates.")
+	parallel := flag.Bool("parallel", false, "Run in parallel. Use only with SSD.")
+	flag.Parse()
+
+	var duplicateDetector fs.DuplicateDetector
+	if *dir == "" {
+		flag.Usage()
+		return
+	}
+	if *parallel {
+		duplicateDetector = fs.NewDuplicateDetectorParallel(*dir)
+	} else {
+		duplicateDetector = fs.NewDuplicateDetectorSerial(*dir)
 	}
 
-	dir := os.Args[1]
-
-	fi, err := os.Stat(dir)
+	fi, err := os.Stat(*dir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -23,8 +35,17 @@ func main() {
 		log.Fatal("You didn't pass the directory in the argument.")
 	}
 
-	duplicateDetector := fs.NewDuplicateDetector(dir)
-	duplicates := duplicateDetector.Search()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	stopCh := make(chan os.Signal, 1)
+	signal.Notify(stopCh, os.Interrupt)
+
+	go func() {
+		<-stopCh
+		cancel()
+	}()
+
+	duplicates := duplicateDetector.Search(ctx)
 	for k, v := range duplicates {
 		fmt.Printf("Duplicate files with hash [%s]:\n", k)
 		for _, path := range v.Paths {

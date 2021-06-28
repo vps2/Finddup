@@ -1,28 +1,30 @@
 package fs
 
 import (
+	"context"
 	"io/fs"
 	"log"
-	"os"
 	"path/filepath"
-
-	"github.com/vps2/finddup/internal/hash"
 )
 
-type DuplicateDetector struct {
+type DuplicateDetectorSerial struct {
 	Root string
 }
 
-func NewDuplicateDetector(root string) *DuplicateDetector {
-	return &DuplicateDetector{
+func NewDuplicateDetectorSerial(root string) *DuplicateDetectorSerial {
+	return &DuplicateDetectorSerial{
 		Root: root,
 	}
 }
 
-func (d *DuplicateDetector) Search() map[string]*Duplicates {
+func (d *DuplicateDetectorSerial) Search(ctx context.Context) map[string]*Duplicates {
 	duplicates := make(map[string]*Duplicates)
 
 	_ = filepath.WalkDir(d.Root, func(path string, d fs.DirEntry, e error) error {
+		if isContextDone(ctx) {
+			return ctx.Err()
+		}
+
 		if e != nil {
 			log.Println(e)
 			return nil
@@ -56,19 +58,4 @@ func (d *DuplicateDetector) Search() map[string]*Duplicates {
 	}
 
 	return duplicates
-}
-
-func calculateFileHash(path string) (string, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	fHash, err := hash.Calculate(file)
-	if err != nil {
-		return "", err
-	}
-
-	return fHash, nil
 }
