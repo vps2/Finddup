@@ -38,11 +38,7 @@ func (d *DuplicateDetectorParallel) Search(ctx context.Context) map[string]*Dupl
 		close(resultsCh)
 	}()
 
-	go func() {
-		for error := range errorsCh {
-			log.Println(error)
-		}
-	}()
+	go logErrors(errorsCh)
 
 	duplicates := make(map[string]*Duplicates)
 	for fi := range resultsCh {
@@ -97,5 +93,11 @@ func visit(ctx context.Context, root string, wg *sync.WaitGroup, results chan<- 
 		if isContextDone(ctx) {
 			return
 		}
+	}
+}
+
+func logErrors(errors <-chan error) {
+	for error := range errors {
+		log.Println(error)
 	}
 }
