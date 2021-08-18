@@ -12,27 +12,30 @@ import (
 )
 
 func main() {
-	dir := flag.String("dir", "", "The directory in which to search for duplicates.")
-	parallel := flag.Bool("parallel", false, "Run in parallel. Use only with SSD.")
+	var dir string
+	var parallel bool
+
+	flag.StringVar(&dir, "dir", "", "The directory in which to search for duplicates.")
+	flag.BoolVar(&parallel, "parallel", false, "Run in parallel. Use only with SSD.")
 	flag.Parse()
 
-	var duplicateDetector fs.DuplicateDetector
-	if *dir == "" {
+	if dir == "" {
 		flag.Usage()
 		return
 	}
-	if *parallel {
-		duplicateDetector = fs.NewDuplicateDetectorParallel(*dir)
-	} else {
-		duplicateDetector = fs.NewDuplicateDetectorSerial(*dir)
-	}
-
-	fi, err := os.Stat(*dir)
+	fi, err := os.Stat(dir)
 	if err != nil {
 		log.Fatal(err)
 	}
 	if !fi.IsDir() {
 		log.Fatal("You didn't pass the directory in the argument.")
+	}
+
+	var duplicateDetector fs.DuplicateDetector
+	if parallel {
+		duplicateDetector = fs.NewDuplicateDetectorParallel(dir)
+	} else {
+		duplicateDetector = fs.NewDuplicateDetectorSerial(dir)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
